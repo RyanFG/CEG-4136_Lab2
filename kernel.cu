@@ -8,15 +8,14 @@
 #define N 256  // Taille du tableau
 
 // CUDA Kernel pour effectuer la réduction parallèle (réduction interlacée)
-__global__ void interleavedReduce(int* input, int n) {
+__global__ void interleavedReduce(int* input, int stride) {
     int tid = threadIdx.x;
 
     // Réduction parallèle par paires interlacées
-    for (int stride = 1; stride < n; stride *= 2) {
-        if (tid % (2 * stride) == 0) {
-            input[tid] += input[tid + stride];
-        }
-    }
+    //printf("|%d,%d+%d=|", tid, input[tid * 2 * stride], input[(tid * 2 * stride) + stride]);
+    input[tid * 2 * stride] += input[(tid * 2 * stride) + stride];
+    //printf("%d\n", input[tid * 2 * stride]);
+
 }
 
 int main() {
@@ -39,8 +38,11 @@ int main() {
     cudaMemcpy(d_input, h_input, N * sizeof(int), cudaMemcpyHostToDevice);
 
     // Lancer le kernel CUDA avec un bloc de N threads
-    interleavedReduce << <1, N >> > (d_input, N);
-    cudaDeviceSynchronize();  // Synchroniser les threads avant de passer à la prochaine étape
+    for (int stride = 1; stride < N; stride *= 2) {
+        interleavedReduce << < 1, (N / (2 * stride)) >> > (d_input, stride);
+        cudaDeviceSynchronize();  // Synchroniser les threads avant de passer à la prochaine étape
+        printf("%d\n", stride);
+    }
 
     // Copier le résultat du GPU vers le CPU
     cudaMemcpy(h_input, d_input, N * sizeof(int), cudaMemcpyDeviceToHost);
@@ -52,4 +54,3 @@ int main() {
     cudaFree(d_input);
 
     return 0;
-}
