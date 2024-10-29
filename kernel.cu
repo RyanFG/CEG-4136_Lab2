@@ -54,3 +54,4 @@ int main() {
     cudaFree(d_input);
 
     return 0;
+}
